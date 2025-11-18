@@ -32,26 +32,26 @@ rand.workspace = true
 rand_xorshift.workspace = true
 
 
-[workspace]
-members = ["rayon-demo", "rayon-core"]
-exclude = ["ci"]
+#[workspace]
+#members = ["rayon-demo", "rayon-core"]
+#exclude = ["ci"]
 
-[workspace.package]
-readme = "README.md"
-rust-version = "1.80"
-edition = "2021"
-license = "MIT OR Apache-2.0"
-repository = "https://github.com/rayon-rs/rayon"
-keywords = ["parallel", "thread", "concurrency", "join", "performance"]
-categories = ["concurrency"]
+# [workspace.package]
+# readme = "README.md"
+# rust-version = "1.80"
+# edition = "2021"
+# license = "MIT OR Apache-2.0"
+# repository = "https://github.com/rayon-rs/rayon"
+# keywords = ["parallel", "thread", "concurrency", "join", "performance"]
+# categories = ["concurrency"]
 
 # Some dependencies may not be their latest version, in order to support older rustc.
-[workspace.dependencies]
-crossbeam-deque = "0.8.1"
-crossbeam-utils = "0.8.0"
-either = { version = "1", default-features = false }
-libc = "0.2"
-rand = "0.9"
-rand_xorshift = "0.4"
-scoped-tls = "1.0"
-wasm_sync = "0.1.0"
+# [workspace.dependencies]
+# crossbeam-deque = "0.8.1"
+# crossbeam-utils = "0.8.0"
+# either = { version = "1", default-features = false }
+# libc = "0.2"
+# rand = "0.9"
+# rand_xorshift = "0.4"
+# scoped-tls = "1.0"
+# wasm_sync = "0.1.0"
