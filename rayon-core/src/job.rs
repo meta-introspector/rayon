@@ -24,6 +24,8 @@ pub(super) trait Job {
     unsafe fn execute(this: *const ());
 }
 
+pub(super) type JobId = (*const (), unsafe fn(*const ()));
+
 /// Effectively a Job trait object. Each JobRef **must** be executed
 /// exactly once, or else data may leak.
 ///
@@ -55,7 +57,7 @@ impl JobRef {
     /// Returns an opaque handle that can be saved and compared,
     /// without making `JobRef` itself `Copy + Eq`.
     #[inline]
-    pub(super) fn id(&self) -> impl Eq {
+    pub(super) fn id(&self) -> JobId {
         (self.pointer, self.execute_fn)
     }
 

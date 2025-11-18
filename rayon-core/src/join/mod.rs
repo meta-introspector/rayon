@@ -1,4 +1,4 @@
-use crate::job::StackJob;
+use crate::job::{JobId, StackJob};
 use crate::latch::SpinLatch;
 use crate::registry::{self, WorkerThread};
 use crate::unwind;
@@ -135,7 +135,7 @@ where
         // long enough.
         let job_b = StackJob::new(call_b(oper_b), SpinLatch::new(worker_thread));
         let job_b_ref = job_b.as_job_ref();
-        let job_b_id = job_b_ref.id();
+        let job_b_id: JobId = job_b_ref.id(); // Explicitly type JobId
         worker_thread.push(job_b_ref);
 
         // Execute task a; hopefully b gets stolen in the meantime.
@@ -158,7 +158,8 @@ where
                 debug_assert!(job_b.latch.probe());
                 break;
             };
-            if job_b_id == job.id() {
+            let job_id = job.id(); // Get ID before any potential move
+            if job_b_id == job_id {
                 // Found it! Let's run it.
                 //
                 // Note that this could panic, but it's ok if we unwind here.
