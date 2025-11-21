@@ -1334,7 +1334,7 @@ unsafe fn par_merge<T, F>(left: &mut [T], right: &mut [T], dest: *mut T, is_less
 where
     T: Send,
     F: Fn(&T, &T) -> bool + Sync,
-{
+{ unsafe {
     // Slices whose lengths sum up to this value are merged sequentially. This number is slightly
     // larger than `CHUNK_LENGTH`, and the reason is that merging is faster than merge sorting, so
     // merging needs a bit coarser granularity in order to hide the overhead of Rayon's task
@@ -1418,7 +1418,7 @@ where
             }
         }
     }
-}
+}}
 
 /// Recursively merges pre-sorted chunks inside `v`.
 ///
@@ -1441,7 +1441,7 @@ unsafe fn merge_recurse<T, F>(
 ) where
     T: Send,
     F: Fn(&T, &T) -> bool + Sync,
-{
+{ unsafe {
     let len = chunks.len();
     debug_assert!(len > 0);
 
@@ -1501,7 +1501,7 @@ unsafe fn merge_recurse<T, F>(
     let src_left = slice::from_raw_parts_mut(src.add(start), mid - start);
     let src_right = slice::from_raw_parts_mut(src.add(mid), end - mid);
     par_merge(src_left, src_right, dest.add(start), is_less);
-}
+}}
 
 /// Sorts `v` using merge sort in parallel.
 ///

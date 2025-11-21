@@ -98,7 +98,7 @@ pub(super) unsafe fn broadcast_in<OP, R>(op: OP, registry: &Arc<Registry>) -> Ve
 where
     OP: Fn(BroadcastContext<'_>) -> R + Sync,
     R: Send,
-{
+{ unsafe {
     let f = move |injected: bool| {
         debug_assert!(injected);
         BroadcastContext::with(&op)
@@ -117,7 +117,7 @@ where
     // Wait for all jobs to complete, then collect the results, maybe propagating a panic.
     latch.wait(current_thread);
     jobs.into_iter().map(|job| job.into_result()).collect()
-}
+}}
 
 /// Execute `op` on every thread in the pool. It will be executed on each
 /// thread when they have nothing else to do locally, before they try to

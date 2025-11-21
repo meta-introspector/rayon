@@ -679,9 +679,9 @@ impl<'scope> ScopeBase<'scope> {
     unsafe fn execute_job<FUNC>(this: *const Self, func: FUNC)
     where
         FUNC: FnOnce(),
-    {
+    { unsafe {
         let _: Option<()> = Self::execute_job_closure(this, func);
-    }
+    }}
 
     /// Executes `func` as a job in scope. Adjusts the "job completed"
     /// counters and also catches any panic and stores it into
@@ -689,7 +689,7 @@ impl<'scope> ScopeBase<'scope> {
     unsafe fn execute_job_closure<FUNC, R>(this: *const Self, func: FUNC) -> Option<R>
     where
         FUNC: FnOnce() -> R,
-    {
+    { unsafe {
         let result = match unwind::halt_unwinding(func) {
             Ok(r) => Some(r),
             Err(err) => {
@@ -699,7 +699,7 @@ impl<'scope> ScopeBase<'scope> {
         };
         Latch::set(&(*this).job_completed_latch);
         result
-    }
+    }}
 
     fn job_panicked(&self, err: Box<dyn Any + Send + 'static>) {
         // capture the first error we see, free the rest
@@ -767,7 +767,7 @@ unsafe impl<T: Sync> Sync for ScopePtr<T> {}
 
 impl<T> ScopePtr<T> {
     // Helper to avoid disjoint captures of `scope_ptr.0`
-    unsafe fn as_ref(&self) -> &T {
+    unsafe fn as_ref(&self) -> &T { unsafe {
         &*self.0
-    }
+    }}
 }

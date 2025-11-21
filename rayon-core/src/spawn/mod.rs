@@ -69,7 +69,7 @@ where
 pub(super) unsafe fn spawn_in<F>(func: F, registry: &Arc<Registry>)
 where
     F: FnOnce() + Send + 'static,
-{
+{ unsafe {
     // We assert that this does not hold any references (we know
     // this because of the `'static` bound in the interface);
     // moreover, we assert that the code below is not supposed to
@@ -79,7 +79,7 @@ where
     let job_ref = spawn_job(func, registry);
     registry.inject_or_push(job_ref);
     mem::forget(abort_guard);
-}
+}}
 
 unsafe fn spawn_job<F>(func: F, registry: &Arc<Registry>) -> JobRef
 where
@@ -141,7 +141,7 @@ where
 pub(super) unsafe fn spawn_fifo_in<F>(func: F, registry: &Arc<Registry>)
 where
     F: FnOnce() + Send + 'static,
-{
+{ unsafe {
     // We assert that this does not hold any references (we know
     // this because of the `'static` bound in the interface);
     // moreover, we assert that the code below is not supposed to
@@ -157,7 +157,7 @@ where
         None => registry.inject(job_ref),
     }
     mem::forget(abort_guard);
-}
+}}
 
 #[cfg(test)]
 mod test;

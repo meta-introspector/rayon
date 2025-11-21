@@ -62,9 +62,9 @@ impl JobRef {
     }
 
     #[inline]
-    pub(super) unsafe fn execute(self) {
+    pub(super) unsafe fn execute(self) { unsafe {
         (self.execute_fn)(self.pointer)
-    }
+    }}
 }
 
 /// A job that will be owned by a stack slot. This means that when it
@@ -96,9 +96,9 @@ where
         }
     }
 
-    pub(super) unsafe fn as_job_ref(&self) -> JobRef {
+    pub(super) unsafe fn as_job_ref(&self) -> JobRef { unsafe {
         JobRef::new(self)
-    }
+    }}
 
     pub(super) unsafe fn run_inline(self, stolen: bool) -> R {
         self.func.into_inner().unwrap()(stolen)
@@ -115,14 +115,14 @@ where
     F: FnOnce(bool) -> R + Send,
     R: Send,
 {
-    unsafe fn execute(this: *const ()) {
+    unsafe fn execute(this: *const ()) { unsafe {
         let this = &*(this as *const Self);
         let abort = unwind::AbortIfPanic;
         let func = (*this.func.get()).take().unwrap();
         (*this.result.get()) = JobResult::call(func);
         Latch::set(&this.latch);
         mem::forget(abort);
-    }
+    }}
 }
 
 /// Represents a job stored in the heap. Used to implement
@@ -149,9 +149,9 @@ where
     /// Creates a `JobRef` from this job -- note that this hides all
     /// lifetimes, so it is up to you to ensure that this JobRef
     /// doesn't outlive any data that it closes over.
-    pub(super) unsafe fn into_job_ref(self: Box<Self>) -> JobRef {
+    pub(super) unsafe fn into_job_ref(self: Box<Self>) -> JobRef { unsafe {
         JobRef::new(Box::into_raw(self))
-    }
+    }}
 
     /// Creates a static `JobRef` from this job.
     pub(super) fn into_static_job_ref(self: Box<Self>) -> JobRef
@@ -166,10 +166,10 @@ impl<BODY> Job for HeapJob<BODY>
 where
     BODY: FnOnce() + Send,
 {
-    unsafe fn execute(this: *const ()) {
+    unsafe fn execute(this: *const ()) { unsafe {
         let this = Box::from_raw(this as *mut Self);
         (this.job)();
-    }
+    }}
 }
 
 /// Represents a job stored in an `Arc` -- like `HeapJob`, but may
@@ -192,9 +192,9 @@ where
     /// Creates a `JobRef` from this job -- note that this hides all
     /// lifetimes, so it is up to you to ensure that this JobRef
     /// doesn't outlive any data that it closes over.
-    pub(super) unsafe fn as_job_ref(this: &Arc<Self>) -> JobRef {
+    pub(super) unsafe fn as_job_ref(this: &Arc<Self>) -> JobRef { unsafe {
         JobRef::new(Arc::into_raw(Arc::clone(this)))
-    }
+    }}
 
     /// Creates a static `JobRef` from this job.
     pub(super) fn as_static_job_ref(this: &Arc<Self>) -> JobRef
@@ -209,10 +209,10 @@ impl<BODY> Job for ArcJob<BODY>
 where
     BODY: Fn() + Send + Sync,
 {
-    unsafe fn execute(this: *const ()) {
+    unsafe fn execute(this: *const ()) { unsafe {
         let this = Arc::from_raw(this as *mut Self);
         (this.job)();
-    }
+    }}
 }
 
 impl<T> JobResult<T> {
@@ -248,17 +248,17 @@ impl JobFifo {
         }
     }
 
-    pub(super) unsafe fn push(&self, job_ref: JobRef) -> JobRef {
+    pub(super) unsafe fn push(&self, job_ref: JobRef) -> JobRef { unsafe {
         // A little indirection ensures that spawns are always prioritized in FIFO order.  The
         // jobs in a thread's deque may be popped from the back (LIFO) or stolen from the front
         // (FIFO), but either way they will end up popping from the front of this queue.
         self.inner.push(job_ref);
         JobRef::new(self)
-    }
+    }}
 }
 
 impl Job for JobFifo {
-    unsafe fn execute(this: *const ()) {
+    unsafe fn execute(this: *const ()) { unsafe {
         // We "execute" a queue by executing its first job, FIFO.
         let this = &*(this as *const Self);
         loop {
@@ -268,5 +268,5 @@ impl Job for JobFifo {
                 Steal::Retry => {}
             }
         }
-    }
+    }}
 }

@@ -518,7 +518,7 @@ impl Registry {
     where
         OP: FnOnce(&WorkerThread, bool) -> R + Send,
         R: Send,
-    {
+    { unsafe {
         thread_local!(static LOCK_LATCH: LockLatch = const { LockLatch::new() });
 
         LOCK_LATCH.with(|l| {
@@ -537,14 +537,14 @@ impl Registry {
 
             job.into_result()
         })
-    }
+    }}
 
     #[cold]
     unsafe fn in_worker_cross<OP, R>(&self, current_thread: &WorkerThread, op: OP) -> R
     where
         OP: FnOnce(&WorkerThread, bool) -> R + Send,
         R: Send,
-    {
+    { unsafe {
         // This thread is a member of a different pool, so let it process
         // other work while waiting for this `op` to complete.
         debug_assert!(current_thread.registry().id() != self.id());
@@ -560,7 +560,7 @@ impl Registry {
         self.inject(job.as_job_ref());
         current_thread.wait_until(&job.latch);
         job.into_result()
-    }
+    }}
 
     /// Increments the terminate counter. This increment should be
     /// balanced by a call to `terminate`, which will decrement. This
@@ -732,9 +732,9 @@ impl WorkerThread {
     }
 
     #[inline]
-    pub(super) unsafe fn push_fifo(&self, job: JobRef) {
+    pub(super) unsafe fn push_fifo(&self, job: JobRef) { unsafe {
         self.push(self.fifo.push(job));
-    }
+    }}
 
     #[inline]
     pub(super) fn local_deque_is_empty(&self) -> bool {
@@ -769,15 +769,15 @@ impl WorkerThread {
     /// Wait until the latch is set. Try to keep busy by popping and
     /// stealing tasks as necessary.
     #[inline]
-    pub(super) unsafe fn wait_until<L: AsCoreLatch + ?Sized>(&self, latch: &L) {
+    pub(super) unsafe fn wait_until<L: AsCoreLatch + ?Sized>(&self, latch: &L) { unsafe {
         let latch = latch.as_core_latch();
         if !latch.probe() {
             self.wait_until_cold(latch);
         }
-    }
+    }}
 
     #[cold]
-    unsafe fn wait_until_cold(&self, latch: &CoreLatch) {
+    unsafe fn wait_until_cold(&self, latch: &CoreLatch) { unsafe {
         // the code below should swallow all panics and hence never
         // unwind; but if something does wrong, we want to abort,
         // because otherwise other code in rayon may assume that the
@@ -814,9 +814,9 @@ impl WorkerThread {
         }
 
         mem::forget(abort_guard); // successful execution, do not abort
-    }
+    }}
 
-    unsafe fn wait_until_out_of_work(&self) {
+    unsafe fn wait_until_out_of_work(&self) { unsafe {
         debug_assert_eq!(self as *const _, WorkerThread::current());
         let registry = &*self.registry;
         let index = self.index;
@@ -828,7 +828,7 @@ impl WorkerThread {
 
         // Let registry know we are done
         Latch::set(&registry.thread_infos[index].stopped);
-    }
+    }}
 
     fn find_work(&self) -> Option<JobRef> {
         // Try to find some work to do. We give preference first
@@ -862,9 +862,9 @@ impl WorkerThread {
     }
 
     #[inline]
-    pub(super) unsafe fn execute(&self, job: JobRef) {
+    pub(super) unsafe fn execute(&self, job: JobRef) { unsafe {
         job.execute();
-    }
+    }}
 
     /// Try to steal a single job and return it.
     ///
@@ -907,7 +907,7 @@ impl WorkerThread {
 
 // ////////////////////////////////////////////////////////////////////////
 
-unsafe fn main_loop(thread: ThreadBuilder) {
+unsafe fn main_loop(thread: ThreadBuilder) { unsafe {
     let worker_thread = &WorkerThread::from(thread);
     WorkerThread::set_current(worker_thread);
     let registry = &*worker_thread.registry;
@@ -936,7 +936,7 @@ unsafe fn main_loop(thread: ThreadBuilder) {
         registry.catch_unwind(|| handler(index));
         // We're already exiting the thread, there's nothing else to do.
     }
-}
+}}
 
 /// If already in a worker-thread, just execute `op`.  Otherwise,
 /// execute `op` in the default thread pool. Either way, block until
