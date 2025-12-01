@@ -22,7 +22,7 @@ web_spin_lock = ["dep:wasm_sync", "rayon-core/web_spin_lock"]
 
 [dependencies]
 # These are both public dependencies!
-rayon-core = { version = "1.13.0", path = "rayon-core" }
+rayon-core.workspace = true
 either.workspace = true
 
 wasm_sync = { workspace = true, optional = true }
