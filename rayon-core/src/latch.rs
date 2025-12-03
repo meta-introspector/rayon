@@ -1,7 +1,7 @@
 use std::marker::PhantomData;
 use std::ops::Deref;
-use std::sync::atomic::{AtomicUsize, Ordering};
 use std::sync::Arc;
+use std::sync::atomic::{AtomicUsize, Ordering};
 
 use crate::registry::{Registry, WorkerThread};
 use crate::sync::{Condvar, Mutex};
@@ -123,10 +123,12 @@ impl CoreLatch {
     /// doing some wakeups; those are encapsulated in the surrounding
     /// latch code.
     #[inline]
-    unsafe fn set(this: *const Self) -> bool { unsafe {
-        let old_state = (*this).state.swap(SET, Ordering::AcqRel);
-        old_state == SLEEPING
-    }}
+    unsafe fn set(this: *const Self) -> bool {
+        unsafe {
+            let old_state = (*this).state.swap(SET, Ordering::AcqRel);
+            old_state == SLEEPING
+        }
+    }
 
     /// Test if this latch has been set.
     #[inline]
@@ -193,33 +195,35 @@ impl AsCoreLatch for SpinLatch<'_> {
 
 impl Latch for SpinLatch<'_> {
     #[inline]
-    unsafe fn set(this: *const Self) { unsafe {
-        let registry: &Registry = if (*this).cross {
-            // Ensure the registry stays alive while we notify it.
-            // Otherwise, it would be possible that we set the spin
-            // latch and the other thread sees it and exits, causing
-            // the registry to be deallocated, all before we get a
-            // chance to invoke `registry.notify_worker_latch_is_set`.
-            &Arc::clone((*this).registry)
-        } else {
-            // If this is not a "cross-registry" spin-latch, then the
-            // thread which is performing `set` is itself ensuring
-            // that the registry stays alive. However, that doesn't
-            // include this *particular* `Arc` handle if the waiting
-            // thread then exits, so we must completely dereference it.
-            (*this).registry
-        };
-        let target_worker_index = (*this).target_worker_index;
+    unsafe fn set(this: *const Self) {
+        unsafe {
+            let registry: &Registry = if (*this).cross {
+                // Ensure the registry stays alive while we notify it.
+                // Otherwise, it would be possible that we set the spin
+                // latch and the other thread sees it and exits, causing
+                // the registry to be deallocated, all before we get a
+                // chance to invoke `registry.notify_worker_latch_is_set`.
+                &Arc::clone((*this).registry)
+            } else {
+                // If this is not a "cross-registry" spin-latch, then the
+                // thread which is performing `set` is itself ensuring
+                // that the registry stays alive. However, that doesn't
+                // include this *particular* `Arc` handle if the waiting
+                // thread then exits, so we must completely dereference it.
+                (*this).registry
+            };
+            let target_worker_index = (*this).target_worker_index;
 
-        // NOTE: Once we `set`, the target may proceed and invalidate `this`!
-        if CoreLatch::set(&(*this).core_latch) {
-            // Subtle: at this point, we can no longer read from
-            // `self`, because the thread owning this spin latch may
-            // have awoken and deallocated the latch. Therefore, we
-            // only use fields whose values we already read.
-            registry.notify_worker_latch_is_set(target_worker_index);
+            // NOTE: Once we `set`, the target may proceed and invalidate `this`!
+            if CoreLatch::set(&(*this).core_latch) {
+                // Subtle: at this point, we can no longer read from
+                // `self`, because the thread owning this spin latch may
+                // have awoken and deallocated the latch. Therefore, we
+                // only use fields whose values we already read.
+                registry.notify_worker_latch_is_set(target_worker_index);
+            }
         }
-    }}
+    }
 }
 
 /// A Latch starts as false and eventually becomes true. You can block
@@ -259,11 +263,13 @@ impl LockLatch {
 
 impl Latch for LockLatch {
     #[inline]
-    unsafe fn set(this: *const Self) { unsafe {
-        let mut guard = (*this).m.lock().unwrap();
-        *guard = true;
-        (*this).v.notify_all();
-    }}
+    unsafe fn set(this: *const Self) {
+        unsafe {
+            let mut guard = (*this).m.lock().unwrap();
+            *guard = true;
+            (*this).v.notify_all();
+        }
+    }
 }
 
 /// Once latches are used to implement one-time blocking, primarily
@@ -298,11 +304,13 @@ impl OnceLatch {
         this: *const Self,
         registry: &Registry,
         target_worker_index: usize,
-    ) { unsafe {
-        if CoreLatch::set(&(*this).core_latch) {
-            registry.notify_worker_latch_is_set(target_worker_index);
+    ) {
+        unsafe {
+            if CoreLatch::set(&(*this).core_latch) {
+                registry.notify_worker_latch_is_set(target_worker_index);
+            }
         }
-    }}
+    }
 }
 
 impl AsCoreLatch for OnceLatch {
@@ -402,25 +410,27 @@ impl CountLatch {
 
 impl Latch for CountLatch {
     #[inline]
-    unsafe fn set(this: *const Self) { unsafe {
-        if (*this).counter.fetch_sub(1, Ordering::SeqCst) == 1 {
-            // NOTE: Once we call `set` on the internal `latch`,
-            // the target may proceed and invalidate `this`!
-            match (*this).kind {
-                CountLatchKind::Stealing {
-                    ref latch,
-                    ref registry,
-                    worker_index,
-                } => {
-                    let registry = Arc::clone(registry);
-                    if CoreLatch::set(latch) {
-                        registry.notify_worker_latch_is_set(worker_index);
+    unsafe fn set(this: *const Self) {
+        unsafe {
+            if (*this).counter.fetch_sub(1, Ordering::SeqCst) == 1 {
+                // NOTE: Once we call `set` on the internal `latch`,
+                // the target may proceed and invalidate `this`!
+                match (*this).kind {
+                    CountLatchKind::Stealing {
+                        ref latch,
+                        ref registry,
+                        worker_index,
+                    } => {
+                        let registry = Arc::clone(registry);
+                        if CoreLatch::set(latch) {
+                            registry.notify_worker_latch_is_set(worker_index);
+                        }
                     }
+                    CountLatchKind::Blocking { ref latch } => LockLatch::set(latch),
                 }
-                CountLatchKind::Blocking { ref latch } => LockLatch::set(latch),
             }
         }
-    }}
+    }
 }
 
 /// `&L` without any implication of `dereferenceable` for `Latch::set`
@@ -451,7 +461,9 @@ impl<L> Deref for LatchRef<'_, L> {
 
 impl<L: Latch> Latch for LatchRef<'_, L> {
     #[inline]
-    unsafe fn set(this: *const Self) { unsafe {
-        L::set((*this).inner);
-    }}
+    unsafe fn set(this: *const Self) {
+        unsafe {
+            L::set((*this).inner);
+        }
+    }
 }

@@ -69,17 +69,19 @@ where
 pub(super) unsafe fn spawn_in<F>(func: F, registry: &Arc<Registry>)
 where
     F: FnOnce() + Send + 'static,
-{ unsafe {
-    // We assert that this does not hold any references (we know
-    // this because of the `'static` bound in the interface);
-    // moreover, we assert that the code below is not supposed to
-    // be able to panic, and hence the data won't leak but will be
-    // enqueued into some deque for later execution.
-    let abort_guard = unwind::AbortIfPanic; // just in case we are wrong, and code CAN panic
-    let job_ref = spawn_job(func, registry);
-    registry.inject_or_push(job_ref);
-    mem::forget(abort_guard);
-}}
+{
+    unsafe {
+        // We assert that this does not hold any references (we know
+        // this because of the `'static` bound in the interface);
+        // moreover, we assert that the code below is not supposed to
+        // be able to panic, and hence the data won't leak but will be
+        // enqueued into some deque for later execution.
+        let abort_guard = unwind::AbortIfPanic; // just in case we are wrong, and code CAN panic
+        let job_ref = spawn_job(func, registry);
+        registry.inject_or_push(job_ref);
+        mem::forget(abort_guard);
+    }
+}
 
 unsafe fn spawn_job<F>(func: F, registry: &Arc<Registry>) -> JobRef
 where
@@ -141,23 +143,25 @@ where
 pub(super) unsafe fn spawn_fifo_in<F>(func: F, registry: &Arc<Registry>)
 where
     F: FnOnce() + Send + 'static,
-{ unsafe {
-    // We assert that this does not hold any references (we know
-    // this because of the `'static` bound in the interface);
-    // moreover, we assert that the code below is not supposed to
-    // be able to panic, and hence the data won't leak but will be
-    // enqueued into some deque for later execution.
-    let abort_guard = unwind::AbortIfPanic; // just in case we are wrong, and code CAN panic
-    let job_ref = spawn_job(func, registry);
+{
+    unsafe {
+        // We assert that this does not hold any references (we know
+        // this because of the `'static` bound in the interface);
+        // moreover, we assert that the code below is not supposed to
+        // be able to panic, and hence the data won't leak but will be
+        // enqueued into some deque for later execution.
+        let abort_guard = unwind::AbortIfPanic; // just in case we are wrong, and code CAN panic
+        let job_ref = spawn_job(func, registry);
 
-    // If we're in the pool, use our thread's private fifo for this thread to execute
-    // in a locally-FIFO order.  Otherwise, just use the pool's global injector.
-    match registry.current_thread() {
-        Some(worker) => worker.push_fifo(job_ref),
-        None => registry.inject(job_ref),
+        // If we're in the pool, use our thread's private fifo for this thread to execute
+        // in a locally-FIFO order.  Otherwise, just use the pool's global injector.
+        match registry.current_thread() {
+            Some(worker) => worker.push_fifo(job_ref),
+            None => registry.inject(job_ref),
+        }
+        mem::forget(abort_guard);
     }
-    mem::forget(abort_guard);
-}}
+}
 
 #[cfg(test)]
 mod test;

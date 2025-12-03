@@ -6,15 +6,15 @@
 use crate::broadcast::BroadcastContext;
 use crate::job::{ArcJob, HeapJob, JobFifo, JobRef};
 use crate::latch::{CountLatch, Latch};
-use crate::registry::{global_registry, in_worker, Registry, WorkerThread};
+use crate::registry::{Registry, WorkerThread, global_registry, in_worker};
 use crate::unwind;
 use std::any::Any;
 use std::fmt;
 use std::marker::PhantomData;
 use std::mem::ManuallyDrop;
 use std::ptr;
-use std::sync::atomic::{AtomicPtr, Ordering};
 use std::sync::Arc;
+use std::sync::atomic::{AtomicPtr, Ordering};
 
 #[cfg(test)]
 mod test;
@@ -679,9 +679,11 @@ impl<'scope> ScopeBase<'scope> {
     unsafe fn execute_job<FUNC>(this: *const Self, func: FUNC)
     where
         FUNC: FnOnce(),
-    { unsafe {
-        let _: Option<()> = Self::execute_job_closure(this, func);
-    }}
+    {
+        unsafe {
+            let _: Option<()> = Self::execute_job_closure(this, func);
+        }
+    }
 
     /// Executes `func` as a job in scope. Adjusts the "job completed"
     /// counters and also catches any panic and stores it into
@@ -689,17 +691,19 @@ impl<'scope> ScopeBase<'scope> {
     unsafe fn execute_job_closure<FUNC, R>(this: *const Self, func: FUNC) -> Option<R>
     where
         FUNC: FnOnce() -> R,
-    { unsafe {
-        let result = match unwind::halt_unwinding(func) {
-            Ok(r) => Some(r),
-            Err(err) => {
-                (*this).job_panicked(err);
-                None
-            }
-        };
-        Latch::set(&(*this).job_completed_latch);
-        result
-    }}
+    {
+        unsafe {
+            let result = match unwind::halt_unwinding(func) {
+                Ok(r) => Some(r),
+                Err(err) => {
+                    (*this).job_panicked(err);
+                    None
+                }
+            };
+            Latch::set(&(*this).job_completed_latch);
+            result
+        }
+    }
 
     fn job_panicked(&self, err: Box<dyn Any + Send + 'static>) {
         // capture the first error we see, free the rest
@@ -767,7 +771,7 @@ unsafe impl<T: Sync> Sync for ScopePtr<T> {}
 
 impl<T> ScopePtr<T> {
     // Helper to avoid disjoint captures of `scope_ptr.0`
-    unsafe fn as_ref(&self) -> &T { unsafe {
-        &*self.0
-    }}
+    unsafe fn as_ref(&self) -> &T {
+        unsafe { &*self.0 }
+    }
 }
